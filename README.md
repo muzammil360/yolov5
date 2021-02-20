@@ -15,7 +15,7 @@ When asked for the API key, enter: `87a1027c5e7f78b4ea3abfb0cb3429fd969eb4aa`.
 python3 train.py --data coco.yaml --cfg yolov5s.yaml --weights '' --batch-size 32
 ```
 
-**NOTE**: If `--batch-size 64` throws OOM (Out of Memory) error, then reduce it by half.
+**NOTE**: If `--batch-size` throws OOM (Out of Memory) error, then reduce it by half.
 
 
 
