@@ -92,6 +92,10 @@ class Model(nn.Module):
             self._initialize_biases()  # only run once
             # print('Strides: %s' % m.stride.tolist())
 
+        # saving intermediate layers output 
+        save_layer_out_idx = self.yaml['save_layer_out_idx']
+        self.all_layer_out = []
+
         # Init weights, biases
         initialize_weights(self)
         self.info()
@@ -119,6 +123,7 @@ class Model(nn.Module):
 
     def forward_once(self, x, profile=False):
         y, dt = [], []  # outputs
+        z = []
         for m in self.model:
             if m.f != -1:  # if not from previous layer
                 x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
@@ -133,6 +138,9 @@ class Model(nn.Module):
 
             x = m(x)  # run
             y.append(x if m.i in self.save else None)  # save output
+            z.append(x if m.i in self.save_layer_out_idx else None)  # save output
+        
+        self.save_layer_out = z              # update the all layer output variable
 
         if profile:
             print('%.1fms total' % sum(dt))
@@ -196,11 +204,10 @@ class Model(nn.Module):
 def parse_model(d, ch):  # model_dict, input_channels(3)
     logger.info('\n%3s%18s%3s%10s  %-40s%-30s' % ('', 'from', 'n', 'params', 'module', 'arguments'))
     anchors, nc, gd, gw = d['anchors'], d['nc'], d['depth_multiple'], d['width_multiple']
-    save = d['save_layer']
     na = (len(anchors[0]) // 2) if isinstance(anchors, list) else anchors  # number of anchors
     no = na * (nc + 5)  # number of outputs = anchors * (classes + 5)
 
-    layers, c2 = [], ch[-1]  # layers, ch out
+    layers, save, c2 = [], [], ch[-1]  # layers, savelist, ch out
     for i, (f, n, m, args) in enumerate(d['backbone'] + d['head']):  # from, number, module, args
         m = eval(m) if isinstance(m, str) else m  # eval strings
         for j, a in enumerate(args):
@@ -240,6 +247,7 @@ def parse_model(d, ch):  # model_dict, input_channels(3)
         np = sum([x.numel() for x in m_.parameters()])  # number params
         m_.i, m_.f, m_.type, m_.np = i, f, t, np  # attach index, 'from' index, type, number params
         logger.info('%3s%18s%3s%10.0f  %-40s%-30s' % (i, f, n, np, t, args))  # print
+        save.extend(x % i for x in ([f] if isinstance(f, int) else f) if x != -1)  # append to savelist        
         layers.append(m_)
         if i == 0:
             ch = []
