@@ -81,10 +81,6 @@ class Model(nn.Module):
         self.names = [str(i) for i in range(self.yaml['nc'])]  # default names
         # print([x.shape for x in self.forward(torch.zeros(1, ch, 64, 64))])
 
-        # saving intermediate layers output 
-        self.save_layer_out_idx = self.yaml['save_layer_out_idx']
-        self.all_layer_out = []
-
         # Build strides, anchors
         m = self.model[-1]  # Detect()
         if isinstance(m, Detect):
@@ -95,7 +91,6 @@ class Model(nn.Module):
             self.stride = m.stride
             self._initialize_biases()  # only run once
             # print('Strides: %s' % m.stride.tolist())
-
 
         # Init weights, biases
         initialize_weights(self)
@@ -124,7 +119,6 @@ class Model(nn.Module):
 
     def forward_once(self, x, profile=False):
         y, dt = [], []  # outputs
-        z = []
         for m in self.model:
             if m.f != -1:  # if not from previous layer
                 x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
@@ -139,9 +133,6 @@ class Model(nn.Module):
 
             x = m(x)  # run
             y.append(x if m.i in self.save else None)  # save output
-            z.append(x if m.i in self.save_layer_out_idx else None)  # save output
-        
-        # self.save_layer_out = z              # update the all layer output variable
 
         if profile:
             print('%.1fms total' % sum(dt))
