@@ -97,7 +97,10 @@ class Model(nn.Module):
         self.info()
         logger.info('')
 
-    def forward(self, x, augment=False, profile=False):
+        # variable for saving intermediate layer output 
+        self.intermediate_out = []
+
+    def forward(self, x, augment=False, profile=False, save_idx=[]):
         if augment:
             img_size = x.shape[-2:]  # height, width
             s = [1, 0.83, 0.67]  # scales
@@ -105,7 +108,7 @@ class Model(nn.Module):
             y = []  # outputs
             for si, fi in zip(s, f):
                 xi = scale_img(x.flip(fi) if fi else x, si, gs=int(self.stride.max()))
-                yi = self.forward_once(xi)[0]  # forward
+                yi = self.forward_once(xi,profile, save_idx)[0]  # forward
                 # cv2.imwrite(f'img_{si}.jpg', 255 * xi[0].cpu().numpy().transpose((1, 2, 0))[:, :, ::-1])  # save
                 yi[..., :4] /= si  # de-scale
                 if fi == 2:
@@ -115,10 +118,11 @@ class Model(nn.Module):
                 y.append(yi)
             return torch.cat(y, 1), None  # augmented inference, train
         else:
-            return self.forward_once(x, profile)  # single-scale inference, train
+            return self.forward_once(x, profile, save_idx)  # single-scale inference, train
 
-    def forward_once(self, x, profile=False):
+    def forward_once(self, x, profile=False, save_idx=[]):
         y, dt = [], []  # outputs
+        z = []
         for m in self.model:
             if m.f != -1:  # if not from previous layer
                 x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
@@ -133,6 +137,9 @@ class Model(nn.Module):
 
             x = m(x)  # run
             y.append(x if m.i in self.save else None)  # save output
+            z.append(x if m.i in save_idx else None)  # save intermedia output
+
+        self.intermediate_out = z
 
         if profile:
             print('%.1fms total' % sum(dt))
@@ -192,7 +199,9 @@ class Model(nn.Module):
     def info(self, verbose=False, img_size=640):  # print model information
         model_info(self, verbose, img_size)
 
-
+    def getIntermediateOutput(self):
+        return self.intermediate_out
+        
 def parse_model(d, ch):  # model_dict, input_channels(3)
     logger.info('\n%3s%18s%3s%10s  %-40s%-30s' % ('', 'from', 'n', 'params', 'module', 'arguments'))
     anchors, nc, gd, gw = d['anchors'], d['nc'], d['depth_multiple'], d['width_multiple']

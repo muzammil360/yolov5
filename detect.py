@@ -68,8 +68,16 @@ def detect(save_img=False):
             img = img.unsqueeze(0)
 
         # Inference
-        t1 = time_synchronized()
-        pred = model(img, augment=opt.augment)[0]
+        t1 = time_synchronized()            
+        pred = model(img, augment=opt.augment, save_idx=[0, 10, 23])[0]
+        outlist = model.getIntermediateOutput()
+
+        # print the intermediate output
+        print("\n")
+        for out in outlist:
+            if out is not None:
+                print(out.shape)
+
 
         # Apply NMS
         pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, classes=opt.classes, agnostic=opt.agnostic_nms)
